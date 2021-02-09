@@ -1,4 +1,5 @@
-﻿using Esri.ArcGISRuntime.Geometry;
+﻿using Esri.ArcGISRuntime.Data;
+using Esri.ArcGISRuntime.Geometry;
 using Esri.ArcGISRuntime.Mapping;
 using Esri.ArcGISRuntime.Symbology;
 using Esri.ArcGISRuntime.UI;
@@ -102,6 +103,14 @@ namespace TestQueryFeatures
             {
                 _overlay = new GraphicsOverlay();
                 MainMapView.GraphicsOverlays.Add(_overlay);
+            }
+        }
+
+        private void FeatuerLayerTilingSwitch_Toggled(object sender, ToggledEventArgs e)
+        {
+            foreach (var fl in MainMapView.Map.OperationalLayers.OfType<FeatureLayer>())
+            {
+                fl.TilingMode = e.Value ? FeatureTilingMode.EnabledWhenSupported : FeatureTilingMode.Disabled;
             }
         }
     }

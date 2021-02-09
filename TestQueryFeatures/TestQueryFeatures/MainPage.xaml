@@ -30,6 +30,10 @@
                         <Label Text="Perform Identify" HorizontalOptions="FillAndExpand" VerticalOptions="Center"/>
                         <Switch x:Name="DoIdentifySwitch" HorizontalOptions="End"/>
                     </StackLayout>
+                    <StackLayout Orientation="Horizontal" Grid.Row="0">
+                        <Label Text="Feature Layer Tiling" HorizontalOptions="FillAndExpand" VerticalOptions="Center"/>
+                        <Switch x:Name="FeatuerLayerTilingSwitch" HorizontalOptions="End" IsToggled="True" Toggled="FeatuerLayerTilingSwitch_Toggled"/>
+                    </StackLayout>
                 </StackLayout>
                 <StackLayout Grid.Row="1" Grid.Column="0" Orientation="Vertical" HorizontalOptions="FillAndExpand" WidthRequest="175" Padding="5,10,10,10">
                     <StackLayout Orientation="Horizontal" HorizontalOptions="CenterAndExpand">
