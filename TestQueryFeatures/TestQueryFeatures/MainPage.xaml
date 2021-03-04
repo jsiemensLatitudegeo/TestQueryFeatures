@@ -22,36 +22,38 @@
         <esri:MapView x:Name="MainMapView" />
         <Grid WidthRequest="500" HeightRequest="500" HorizontalOptions="Start" VerticalOptions="Start" Margin="20">
             <Rectangle Style="{StaticResource PanelStyle}"/>
-            <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,*">
-                <StackLayout Margin="10" HorizontalOptions="FillAndExpand" Grid.ColumnSpan="2">
-                    <Label Text="Options" FontSize="18" FontAttributes="Bold"/>
-                    <Rectangle HorizontalOptions="FillAndExpand" VerticalOptions="Start" HeightRequest="1" Background="Black"/>
-                    <StackLayout Orientation="Horizontal" Grid.Row="0">
-                        <Label Text="Perform Identify" HorizontalOptions="FillAndExpand" VerticalOptions="Center"/>
-                        <Switch x:Name="DoIdentifySwitch" HorizontalOptions="End"/>
+            <ScrollView>
+                <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,*">
+                    <StackLayout Margin="10" HorizontalOptions="FillAndExpand" Grid.ColumnSpan="2">
+                        <Label Text="Options" FontSize="18" FontAttributes="Bold"/>
+                        <Rectangle HorizontalOptions="FillAndExpand" VerticalOptions="Start" HeightRequest="1" Background="Black"/>
+                        <StackLayout Orientation="Horizontal" Grid.Row="0">
+                            <Label Text="Perform Identify" HorizontalOptions="FillAndExpand" VerticalOptions="Center"/>
+                            <Switch x:Name="DoIdentifySwitch" HorizontalOptions="End"/>
+                        </StackLayout>
+                        <StackLayout Orientation="Horizontal" Grid.Row="0">
+                            <Label Text="Feature Layer Tiling" HorizontalOptions="FillAndExpand" VerticalOptions="Center"/>
+                            <Switch x:Name="FeatuerLayerTilingSwitch" HorizontalOptions="End" IsToggled="True" Toggled="FeatuerLayerTilingSwitch_Toggled"/>
+                        </StackLayout>
                     </StackLayout>
-                    <StackLayout Orientation="Horizontal" Grid.Row="0">
-                        <Label Text="Feature Layer Tiling" HorizontalOptions="FillAndExpand" VerticalOptions="Center"/>
-                        <Switch x:Name="FeatuerLayerTilingSwitch" HorizontalOptions="End" IsToggled="True" Toggled="FeatuerLayerTilingSwitch_Toggled"/>
+                    <StackLayout Grid.Row="1" Grid.Column="0" Orientation="Vertical" HorizontalOptions="FillAndExpand" WidthRequest="175" Padding="5,10,10,10">
+                        <StackLayout Orientation="Horizontal" HorizontalOptions="CenterAndExpand">
+                            <Label Text="Query" FontSize="18" FontAttributes="Bold"/>
+                            <Image x:Name="QuerySwatch"/>
+                        </StackLayout>
+                        <Rectangle HorizontalOptions="FillAndExpand" VerticalOptions="Start" HeightRequest="1" Background="Black"/>
+                        <Label x:Name="QueryGeometryLabel"/>
                     </StackLayout>
-                </StackLayout>
-                <StackLayout Grid.Row="1" Grid.Column="0" Orientation="Vertical" HorizontalOptions="FillAndExpand" WidthRequest="175" Padding="5,10,10,10">
-                    <StackLayout Orientation="Horizontal" HorizontalOptions="CenterAndExpand">
-                        <Label Text="Query" FontSize="18" FontAttributes="Bold"/>
-                        <Image x:Name="QuerySwatch"/>
+                    <StackLayout Grid.Row="1" Grid.Column="1" Orientation="Vertical" HorizontalOptions="FillAndExpand" WidthRequest="175" Padding="10,10,5,10" IsVisible="{Binding IsToggled, Source={x:Reference DoIdentifySwitch}}">
+                        <StackLayout Orientation="Horizontal" HorizontalOptions="CenterAndExpand">
+                            <Label Text="Identify" FontSize="18" FontAttributes="Bold"/>
+                            <Image x:Name="IdentifySwatch"/>
+                        </StackLayout>
+                        <Rectangle HorizontalOptions="FillAndExpand" VerticalOptions="Start" HeightRequest="1" Background="Black"/>
+                        <Label x:Name="IdentifyGeometryLabel"/>
                     </StackLayout>
-                    <Rectangle HorizontalOptions="FillAndExpand" VerticalOptions="Start" HeightRequest="1" Background="Black"/>
-                    <Label x:Name="QueryGeometryLabel"/>
-                </StackLayout>
-                <StackLayout Grid.Row="1" Grid.Column="1" Orientation="Vertical" HorizontalOptions="FillAndExpand" WidthRequest="175" Padding="10,10,5,10" IsVisible="{Binding IsToggled, Source={x:Reference DoIdentifySwitch}}">
-                    <StackLayout Orientation="Horizontal" HorizontalOptions="CenterAndExpand">
-                        <Label Text="Identify" FontSize="18" FontAttributes="Bold"/>
-                        <Image x:Name="IdentifySwatch"/>
-                    </StackLayout>
-                    <Rectangle HorizontalOptions="FillAndExpand" VerticalOptions="Start" HeightRequest="1" Background="Black"/>
-                    <Label x:Name="IdentifyGeometryLabel"/>
-                </StackLayout>
-            </Grid>
+                </Grid>
+            </ScrollView>
         </Grid>
     </Grid>
 

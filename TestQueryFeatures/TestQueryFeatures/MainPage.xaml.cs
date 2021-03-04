@@ -18,7 +18,7 @@ namespace TestQueryFeatures
     {
         private GraphicsOverlay _overlay;
         private LineSymbol _identifySymbol = new SimpleLineSymbol(SimpleLineSymbolStyle.Solid, System.Drawing.Color.FromArgb(128, Color.Cyan), 2);
-        private LineSymbol _querySymbol = new SimpleLineSymbol(SimpleLineSymbolStyle.Solid, System.Drawing.Color.FromArgb(128, Color.Orange), 4);
+        private LineSymbol _querySymbol = new SimpleLineSymbol(SimpleLineSymbolStyle.Solid, System.Drawing.Color.FromArgb(128, Color.Purple), 4);
 
         public MainPage()
         {
@@ -30,7 +30,55 @@ namespace TestQueryFeatures
 
         private async void SetMap()
         {
-            MainMapView.Map = await Map.LoadFromUriAsync(new Uri("https://latitudegeo.maps.arcgis.com/home/item.html?id=335c18b8e2344c44ab8e126412432dea"));
+            MainMapView.ViewpointChanged += MainMapView_ViewpointChanged;
+            MainMapView.NavigationCompleted += MainMapView_NavigationCompleted;
+            MainMapView.Map = await Map.LoadFromUriAsync(new Uri("https://latitudegeo.maps.arcgis.com/home/item.html?id=c6008288a95247428fc55d9aaa72b670"));
+
+            foreach (var fl in MainMapView.Map.OperationalLayers.OfType<FeatureLayer>())
+            {
+                if (fl.FeatureTable is ServiceFeatureTable serviceTable)
+                {
+                    serviceTable.FeatureRequestMode = FeatureRequestMode.ManualCache;
+                }
+            }
+        }
+
+        private void MainMapView_ViewpointChanged(object sender, EventArgs e)
+        {
+            MainMapView.ViewpointChanged -= MainMapView_ViewpointChanged;
+            UpdateFeatures();
+        }
+
+        private async void MainMapView_NavigationCompleted(object sender, EventArgs e)
+        {
+            UpdateFeatures();
+        }
+
+        private async void UpdateFeatures()
+        {
+            var extent = MainMapView.GetCurrentViewpoint(ViewpointType.BoundingGeometry).TargetGeometry;
+            foreach (var fl in MainMapView.Map.OperationalLayers.OfType<FeatureLayer>())
+            {
+                if (fl.FeatureTable is ServiceFeatureTable serviceTable)
+                {
+                    int offset = 0;
+                    while (true)
+                    {
+                        var result = await serviceTable.PopulateFromServiceAsync(new QueryParameters()
+                        {
+                            Geometry = extent,
+                            ResultOffset = offset
+                        }, false, serviceTable.Fields.Select(x => x.Name));
+
+                        offset += result.Count();
+
+                        if (!result.IsTransferLimitExceeded)
+                        {
+                            break;
+                        }
+                    }
+                }
+            }
         }
 
         private async void InitUI()
@@ -45,7 +93,7 @@ namespace TestQueryFeatures
         {
             Reset();
 
-            var layer = (FeatureLayer)MainMapView.Map.OperationalLayers[0];
+            var layer = (FeatureLayer)MainMapView.Map.OperationalLayers.First(X => X.Id == "Victoria_Buildings_4805");
             var queryResults = await layer.FeatureTable.QueryFeaturesAsync(new Esri.ArcGISRuntime.Data.QueryParameters()
             {
                 Geometry = GeometryEngine.Buffer(e.Location, 20 * MainMapView.UnitsPerPixel)
@@ -106,12 +154,22 @@ namespace TestQueryFeatures
             }
         }
 
-        private void FeatuerLayerTilingSwitch_Toggled(object sender, ToggledEventArgs e)
+        private async void FeatuerLayerTilingSwitch_Toggled(object sender, ToggledEventArgs e)
         {
             foreach (var fl in MainMapView.Map.OperationalLayers.OfType<FeatureLayer>())
             {
                 fl.TilingMode = e.Value ? FeatureTilingMode.EnabledWhenSupported : FeatureTilingMode.Disabled;
+                if (fl.FeatureTable is ServiceFeatureTable serviceTable)
+                {
+                    serviceTable.ClearCache(true);
+                }
             }
+
+            var currentViewpoint = MainMapView.GetCurrentViewpoint(ViewpointType.CenterAndScale);
+            var locationCenter = (MapPoint)currentViewpoint.TargetGeometry;
+            var screenCenter = MainMapView.LocationToScreen(locationCenter);
+            var shiftedLocationCenter = MainMapView.ScreenToLocation(new Point(screenCenter.X + 1, screenCenter.Y));
+            MainMapView.SetViewpoint(new Viewpoint(shiftedLocationCenter, currentViewpoint.TargetScale));
         }
     }
 }
