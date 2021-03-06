@@ -29,13 +29,8 @@ namespace TestQueryFeatures
             LevelsOfDetail = vectorTileInfo.LevelsOfDetail.Select(x => new TileCacheTrackerLevel(vectorTileInfo, x)).OrderByDescending(x => x.LevelOfDetail.Scale).ToArray();
         }
 
-        public (TileCacheTrackerLevel Level, Tile[,] Tiles) GetTiles(double scale, Envelope envelope)
+        public TileCacheTrackerLevel GetNearestLevel(double scale)
         {
-            if (envelope is null)
-            {
-                throw new ArgumentNullException(nameof(envelope));
-            }
-
             // Find the closest level that is greater than or equal to the scale
             TileCacheTrackerLevel level = null;
             foreach (var lod in LevelsOfDetail)
@@ -46,6 +41,17 @@ namespace TestQueryFeatures
                 }
             }
 
+            return level;
+        }
+
+        public (TileCacheTrackerLevel Level, Tile[,] Tiles) GetTiles(double scale, Envelope envelope)
+        {
+            if (envelope is null)
+            {
+                throw new ArgumentNullException(nameof(envelope));
+            }
+
+            var level = GetNearestLevel(scale);
             var tiles = level.GetTiles(envelope);
             return (level, tiles);
         }

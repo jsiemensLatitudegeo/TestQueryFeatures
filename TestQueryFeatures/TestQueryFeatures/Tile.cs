@@ -12,15 +12,12 @@ namespace TestQueryFeatures
 
         public Envelope Envelope { get; }
 
-        public bool IsCached { get; }
-
         public LevelOfDetail LevelOfDetail { get; }
 
-        public Tile(TilePosition position, bool isCached, Envelope envelope, LevelOfDetail lod)
+        public Tile(TilePosition position, Envelope envelope, LevelOfDetail lod)
         {
             Position = position;
             Envelope = envelope ?? throw new ArgumentNullException(nameof(envelope));
-            IsCached = isCached;
             LevelOfDetail = lod ?? throw new ArgumentNullException(nameof(lod));
         }
     }

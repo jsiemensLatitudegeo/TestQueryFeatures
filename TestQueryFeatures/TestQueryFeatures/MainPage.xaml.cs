@@ -10,6 +10,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Xamarin.Forms;
 
@@ -21,8 +22,7 @@ namespace TestQueryFeatures
         private LineSymbol _identifySymbol = new SimpleLineSymbol(SimpleLineSymbolStyle.Solid, System.Drawing.Color.FromArgb(128, Color.Cyan), 2);
         private LineSymbol _querySymbol = new SimpleLineSymbol(SimpleLineSymbolStyle.Solid, System.Drawing.Color.FromArgb(128, Color.Purple), 4);
         private TileCacheTracker _tileCacheTracker;
-        private GraphicsOverlay _graphics = new GraphicsOverlay();
-        private double _scale;
+        private TileHighlighter _tileHighlighter;
 
         public MainPage()
         {
@@ -30,14 +30,13 @@ namespace TestQueryFeatures
             SetMap();
             InitUI();
             MainMapView.GeoViewTapped += MainMapView_GeoViewTapped;
-            MainMapView.GraphicsOverlays.Add(_graphics);
         }
 
         private async void SetMap()
         {
             MainMapView.ViewpointChanged += MainMapView_ViewpointChanged;
             MainMapView.NavigationCompleted += MainMapView_NavigationCompleted;
-            MainMapView.Map = await Map.LoadFromUriAsync(new Uri("https://latitudegeo.maps.arcgis.com/home/item.html?id=c6008288a95247428fc55d9aaa72b670"));
+            MainMapView.Map = await Map.LoadFromUriAsync(new Uri("https://latitudegeo.maps.arcgis.com/home/item.html?id=211f9fb2a58b4a7693fb28fec4b1ce71"));
 
             foreach (var fl in MainMapView.Map.OperationalLayers.OfType<FeatureLayer>())
             {
@@ -57,6 +56,8 @@ namespace TestQueryFeatures
                 var vectorTiledLayer = MainMapView.Map.Basemap.BaseLayers.Union(MainMapView.Map.Basemap.ReferenceLayers).OfType<ArcGISVectorTiledLayer>().FirstOrDefault();
                 _tileCacheTracker = new TileCacheTracker(vectorTiledLayer.SourceInfo);
             }
+
+            _tileHighlighter = new TileHighlighter(_tileCacheTracker, MainMapView);
         }
 
         private void MainMapView_ViewpointChanged(object sender, EventArgs e)
@@ -67,68 +68,61 @@ namespace TestQueryFeatures
 
         private void MainMapView_NavigationCompleted(object sender, EventArgs e)
         {
-            var newScale = MainMapView.GetCurrentViewpoint(ViewpointType.CenterAndScale).TargetScale;
-
-            if (_scale != newScale)
-            {
-                _graphics.Graphics.Clear();
-            }
-
-            _scale = newScale;
-
             UpdateFeatures();
         }
+
+        private SemaphoreSlim _updateFeaturesSemaphore = new SemaphoreSlim(5);
 
         private async void UpdateFeatures()
         {
             var scale = MainMapView.GetCurrentViewpoint(ViewpointType.CenterAndScale).TargetScale;
             var extent = (Envelope)MainMapView.GetCurrentViewpoint(ViewpointType.BoundingGeometry).TargetGeometry;
-            foreach (var fl in MainMapView.Map.OperationalLayers.OfType<FeatureLayer>())
+            (var level, var tiles) = _tileCacheTracker.GetTiles(scale, extent);
+
+            var allRequests = new List<Task>();
+            foreach (var tile in tiles)
             {
-                if (fl.FeatureTable is ServiceFeatureTable serviceTable)
+                if (level.IsTileCached(tile.Position))
                 {
-                    (var level, var tiles) = _tileCacheTracker.GetTiles(scale, extent);
+                    Debug.WriteLine($"*** Skipping cached tile {tile.LevelOfDetail.Level}: {tile.Position}; {tile.Envelope} ***");
+                    continue;
+                }
 
-                    foreach (var tile in tiles)
+                _tileHighlighter.HighlightTile(tile);
+                Debug.WriteLine($"--- Begining request for tile {tile.LevelOfDetail.Level}: {tile.Position}; {tile.Envelope} ---");
+
+                foreach (var fl in MainMapView.Map.OperationalLayers.OfType<FeatureLayer>())
+                {
+                    allRequests.Add(RequestForLayer(fl, tile));
+                }
+
+                level.MarkTileAsCached(tile.Position);
+            }
+
+            await Task.WhenAll(allRequests);
+        }
+
+        private async Task RequestForLayer(FeatureLayer fl, Tile tile)
+        {
+            if (fl.FeatureTable is ServiceFeatureTable serviceTable)
+            {
+                Debug.WriteLine($"- Begining request for layer {fl.Name} -");
+                int offset = 0;
+
+                while (true)
+                {
+                    var result = await serviceTable.PopulateFromServiceAsync(new QueryParameters()
                     {
-                        if (tile.IsCached)
-                        {
-                            continue;
-                        }
+                        Geometry = tile.Envelope,
+                        ResultOffset = offset
+                    }, false, serviceTable.Fields.Select(x => x.Name));
+                    Debug.WriteLine($"{result.Count()} features returned.");
 
-                        Debug.WriteLine($"--- Begining request for tile {tile.Position}; {tile.Envelope} ---");
-                        int offset = 0;
+                    offset += result.Count();
 
-                        _graphics.Graphics.Add(new Graphic()
-                        {
-                            Geometry = tile.Envelope,
-                            Symbol = new SimpleFillSymbol()
-                        });
-
-                        _graphics.Graphics.Add(new Graphic()
-                        {
-                            Geometry = tile.Envelope.GetCenter(),
-                            Symbol = new TextSymbol($"({tile.Position})", System.Drawing.Color.Black, 32, HorizontalAlignment.Center, VerticalAlignment.Middle)
-                        });
-
-                        while (true)
-                        {
-                            var result = await serviceTable.PopulateFromServiceAsync(new QueryParameters()
-                            {
-                                Geometry = tile.Envelope,
-                                ResultOffset = offset
-                            }, false, serviceTable.Fields.Select(x => x.Name));
-                            Debug.WriteLine($"{result.Count()} features returned.");
-
-                            offset += result.Count();
-
-                            if (!result.IsTransferLimitExceeded)
-                            {
-                                break;
-                            }
-                        }
-
-                        level.MarkTileAsCached(tile.Position);
+                    if (!result.IsTransferLimitExceeded)
+                    {
+                        break;
                     }
                 }
             }

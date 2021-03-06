@@ -57,9 +57,9 @@ namespace TestQueryFeatures
                 throw new ArgumentNullException(nameof(envelope));
             }
 
-            var startRow = (int)Math.Floor((Origin.Y - envelope.YMax) / TileHeightMapUnits);
+            var startRow = (int)Math.Floor((Origin.Y - envelope.YMax) / TileHeightMapUnits) - 1;
             var startColumn = (int)Math.Floor((envelope.XMin - Origin.X) / TileWidthMapUnits);
-            var endRow = (int)Math.Ceiling((Origin.Y - envelope.YMin) / TileHeightMapUnits);
+            var endRow = (int)Math.Ceiling((Origin.Y - envelope.YMin) / TileHeightMapUnits) - 1;
             var endColumn = (int)Math.Ceiling((envelope.XMax - Origin.X) / TileWidthMapUnits);
 
             var numRows = endRow - startRow + 1;
@@ -73,10 +73,10 @@ namespace TestQueryFeatures
                     int row = y + startRow;
                     var tilePosition = new TilePosition(row, column);
                     var xmin = Origin.X + (column * TileWidthMapUnits);
-                    var ymin = Origin.Y - (row * TileHeightMapUnits);
+                    var ymin = Origin.Y - ((row + 1) * TileHeightMapUnits);
                     var xmax = xmin + TileWidthMapUnits;
                     var ymax = ymin + TileHeightMapUnits;
-                    tiles[x, y] = new Tile(tilePosition, IsTileCached(tilePosition), new Envelope(xmin, ymin, xmax, ymax, SpatialReference), LevelOfDetail);
+                    tiles[x, y] = new Tile(tilePosition, new Envelope(xmin, ymin, xmax, ymax, SpatialReference), LevelOfDetail);
                 }
             }
 
