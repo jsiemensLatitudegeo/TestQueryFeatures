@@ -55,5 +55,13 @@ namespace TestQueryFeatures
             var tiles = level.GetTiles(envelope);
             return (level, tiles);
         }
+
+        public void Reset()
+        {
+            foreach (var level in LevelsOfDetail)
+            {
+                level.Reset();
+            }
+        }
     }
 }

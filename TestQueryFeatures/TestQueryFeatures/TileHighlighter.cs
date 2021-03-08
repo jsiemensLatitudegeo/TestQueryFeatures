@@ -14,6 +14,7 @@ namespace TestQueryFeatures
         private readonly TileCacheTracker _tracker;
         private readonly MapView _mapView;
         private readonly Dictionary<LevelOfDetail, GraphicsOverlay> _overlays = new Dictionary<LevelOfDetail, GraphicsOverlay>();
+        private bool _show;
 
         public TileHighlighter(TileCacheTracker tracker, MapView mapView)
         {
@@ -23,6 +24,14 @@ namespace TestQueryFeatures
         }
 
         private void MapView_ViewpointChanged(object sender, EventArgs e)
+        {
+            if (_show)
+            {
+                UpdateOverlayVisibilities();
+            }
+        }
+
+        private void UpdateOverlayVisibilities()
         {
             var scale = _mapView.GetCurrentViewpoint(ViewpointType.CenterAndScale).TargetScale;
 
@@ -77,10 +86,36 @@ namespace TestQueryFeatures
                 return overlay;
             }
 
-            overlay = new GraphicsOverlay();
+            overlay = new GraphicsOverlay()
+            {
+                IsVisible = _show
+            };
             _overlays.Add(lod, overlay);
             _mapView.GraphicsOverlays.Add(overlay);
             return overlay;
+        }
+
+        public void Reset()
+        {
+            foreach (var overlay in _overlays.Values)
+            {
+                overlay.Graphics.Clear();
+            }
+        }
+
+        public void Show()
+        {
+            _show = true;
+            UpdateOverlayVisibilities();
+        }
+
+        public void Hide()
+        {
+            _show = false;
+            foreach (var overlay in _overlays.Values)
+            {
+                overlay.IsVisible = false;
+            }
         }
     }
 }

@@ -24,6 +24,8 @@ namespace TestQueryFeatures
 
         public LevelOfDetail LevelOfDetail { get; }
 
+        public int FeatureCount { get; set; }
+
         public TileCacheTrackerLevel(TileInfo tileInfo, LevelOfDetail level)
         {
             TileInfo = tileInfo ?? throw new ArgumentNullException(nameof(tileInfo));
@@ -81,6 +83,12 @@ namespace TestQueryFeatures
             }
 
             return tiles;
+        }
+
+        public void Reset()
+        {
+            _cachedTiles.Clear();
+            FeatureCount = 0;
         }
     }
 }
