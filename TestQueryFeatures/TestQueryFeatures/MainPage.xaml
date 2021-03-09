@@ -38,7 +38,7 @@
                     </StackLayout>
                     <StackLayout Orientation="Horizontal" Grid.Row="0">
                         <Label Text="Feature Count" HorizontalOptions="FillAndExpand" VerticalOptions="Center"/>
-                        <Label Text="{Binding Tiler.FeatureCount, Source={x:Reference Self}, Converter={StaticResource NumberForamtter}, ConverterParameter='##,#'}"/>
+                        <Label Text="{Binding Tiler.FeatureCount, Source={x:Reference Self}, Converter={StaticResource NumberForamtter}, ConverterParameter='#,0'}"/>
                     </StackLayout>
                     <StackLayout Orientation="Horizontal" Grid.Row="0">
                         <Label x:Name="DrawStatusLabel" HorizontalOptions="FillAndExpand" VerticalOptions="Center"/>

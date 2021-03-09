@@ -84,7 +84,7 @@ namespace TestQueryFeatures
             {
                 if (fl.FeatureTable is ServiceFeatureTable serviceTable)
                 {
-                    //serviceTable.ClearCache(true);
+                    serviceTable.ClearCache(true);
                 }
             }
 
@@ -120,14 +120,14 @@ namespace TestQueryFeatures
         private async Task UpdateFeatures()
         {
             var cancellation = _cancellation;
+            var scale = _mapView.GetCurrentViewpoint(ViewpointType.CenterAndScale).TargetScale;
+            var extent = (Envelope)_mapView.GetCurrentViewpoint(ViewpointType.BoundingGeometry).TargetGeometry;
+            (var level, var tiles) = _tileCacheTracker.GetTiles(scale, extent);
+            FeatureCount = level.FeatureCount;
             await Task.Run(async () =>
             {
-                var scale = _mapView.GetCurrentViewpoint(ViewpointType.CenterAndScale).TargetScale;
-                var extent = (Envelope)_mapView.GetCurrentViewpoint(ViewpointType.BoundingGeometry).TargetGeometry;
-                (var level, var tiles) = _tileCacheTracker.GetTiles(scale, extent);
-
                 var allRequests = new List<Task>();
-                foreach (var tile in tiles)
+                foreach (var tile in tiles.EnumerateColumnsThenRows())
                 {
                     if (level.IsTileCached(tile.Position))
                     {
@@ -147,7 +147,12 @@ namespace TestQueryFeatures
                                 level.FeatureCount += count.Result;
                                 Device.BeginInvokeOnMainThread(() =>
                                 {
-                                    FeatureCount = level.FeatureCount;
+                                    var currentScale = _mapView.GetCurrentViewpoint(ViewpointType.CenterAndScale).TargetScale;
+                                    var currentLevel = _tileCacheTracker.GetNearestLevel(currentScale);
+                                    if (level == currentLevel)
+                                    {
+                                        FeatureCount = level.FeatureCount;
+                                    }
                                 });
                             }
                         }));
@@ -173,7 +178,7 @@ namespace TestQueryFeatures
                     {
                         Geometry = tile.Envelope,
                         ResultOffset = offset
-                    }, false, Array.Empty<string>(), _cancellation.Token);
+                    }, false, new string[] { serviceTable.ObjectIdField }, _cancellation.Token);
                     var count = result.Count();
                     //Debug.WriteLine($"{count} features returned.");
 

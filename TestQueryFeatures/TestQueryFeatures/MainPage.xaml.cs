@@ -32,7 +32,6 @@ namespace TestQueryFeatures
             InitializeComponent();
             SetMap();
             MainMapView.GeoViewTapped += MainMapView_GeoViewTapped;
-            //MainMapView.DrawStatusChanged += MainMapView_DrawStatusChanged;
 
             var drawStatusChanged = Observable.FromEventPattern<DrawStatusChangedEventArgs>((handler) =>
             {
@@ -43,7 +42,7 @@ namespace TestQueryFeatures
             });
 
             drawStatusChanged.Where(x => x.EventArgs.Status == DrawStatus.InProgress).ObserveOn(SynchronizationContext.Current).Subscribe(DrawStart);
-            drawStatusChanged.Where(x => x.EventArgs.Status == DrawStatus.Completed).Throttle(TimeSpan.FromMilliseconds(3000)).ObserveOn(SynchronizationContext.Current).Subscribe(DrawStop);
+            drawStatusChanged.Where(x => x.EventArgs.Status == DrawStatus.Completed).Throttle(TimeSpan.FromMilliseconds(2000)).ObserveOn(SynchronizationContext.Current).Subscribe(DrawStop);
         }
 
         private void DrawStop(EventPattern<DrawStatusChangedEventArgs> e)
@@ -51,7 +50,7 @@ namespace TestQueryFeatures
             _runTimer = false;
             _drawTimer.Stop();
             DrawStatusLabel.Text = "Draw Complete";
-            UpdateDrawTime(TimeSpan.FromSeconds(3));
+            UpdateDrawTime(TimeSpan.FromSeconds(2));
             _drawTimer.Reset();
         }
 

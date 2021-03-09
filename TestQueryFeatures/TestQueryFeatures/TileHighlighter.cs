@@ -6,6 +6,7 @@ using Esri.ArcGISRuntime.Xamarin.Forms;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading;
 
 namespace TestQueryFeatures
 {
@@ -50,33 +51,43 @@ namespace TestQueryFeatures
             }
         }
 
-        public void HighlightTile(Tile tile)
+        private SemaphoreSlim _highlightSemaphore = new SemaphoreSlim(1);
+
+        public async void HighlightTile(Tile tile)
         {
             if (tile is null)
             {
                 throw new ArgumentNullException(nameof(tile));
             }
 
-            var _overlay = GetOverlay(tile.LevelOfDetail);
-            _overlay.Graphics.Add(new Graphic()
+            await _highlightSemaphore.WaitAsync();
+            try
             {
-                Geometry = tile.Envelope,
-                Symbol = new SimpleFillSymbol(
-                    SimpleFillSymbolStyle.Solid, 
-                    System.Drawing.Color.FromArgb(11, System.Drawing.Color.Indigo), 
-                    new SimpleLineSymbol(
-                        SimpleLineSymbolStyle.Solid, 
-                        System.Drawing.Color.Red,
-                        2)),
-                ZIndex = 1
-            });
+                var overlay = GetOverlay(tile.LevelOfDetail);
+                overlay.Graphics.Add(new Graphic()
+                {
+                    Geometry = tile.Envelope,
+                    Symbol = new SimpleFillSymbol(
+                        SimpleFillSymbolStyle.Solid,
+                        System.Drawing.Color.FromArgb(11, System.Drawing.Color.Indigo),
+                        new SimpleLineSymbol(
+                            SimpleLineSymbolStyle.Solid,
+                            System.Drawing.Color.Red,
+                            2)),
+                    ZIndex = 1
+                });
 
-            _overlay.Graphics.Add(new Graphic()
+                overlay.Graphics.Add(new Graphic()
+                {
+                    Geometry = tile.Envelope.GetCenter(),
+                    Symbol = new TextSymbol($"{tile.LevelOfDetail.Level}: ({tile.Position})", System.Drawing.Color.White, 32, HorizontalAlignment.Center, VerticalAlignment.Middle) { HaloColor = System.Drawing.Color.Black },
+                    ZIndex = 2
+                });
+            }
+            finally
             {
-                Geometry = tile.Envelope.GetCenter(),
-                Symbol = new TextSymbol($"{tile.LevelOfDetail.Level}: ({tile.Position})", System.Drawing.Color.White, 32, HorizontalAlignment.Center, VerticalAlignment.Middle) { HaloColor = System.Drawing.Color.Black },
-                ZIndex = 2
-            });
+                _highlightSemaphore.Release();
+            }
         }
 
         private GraphicsOverlay GetOverlay(LevelOfDetail lod)
