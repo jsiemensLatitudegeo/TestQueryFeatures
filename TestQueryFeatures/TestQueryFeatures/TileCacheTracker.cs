@@ -1,9 +1,11 @@
 ﻿using Esri.ArcGISRuntime.ArcGISServices;
 using Esri.ArcGISRuntime.Geometry;
+using Esri.ArcGISRuntime.Mapping;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace TestQueryFeatures
 {
@@ -52,8 +54,21 @@ namespace TestQueryFeatures
             }
 
             var level = GetNearestLevel(scale);
-            var tiles = level.GetTiles(envelope);
+            var tiles = level.GetTiles(envelope.ToSlimEnvelope());
             return (level, tiles);
+        }
+
+        public bool DoesCacheCover(Tile tile, Layer layer)
+        {
+            bool doesCover = false;
+            Parallel.ForEach(LevelsOfDetail, level =>
+            {
+                if (level.DoesCacheCover(tile, layer))
+                {
+                    doesCover = true;
+                }
+            });
+            return doesCover;
         }
 
         public void Reset()

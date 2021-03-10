@@ -14,7 +14,7 @@ namespace TestQueryFeatures
     {
         private readonly TileCacheTracker _tracker;
         private readonly MapView _mapView;
-        private readonly Dictionary<LevelOfDetail, GraphicsOverlay> _overlays = new Dictionary<LevelOfDetail, GraphicsOverlay>();
+        private readonly Dictionary<LevelOfDetail, LevelHighlights> _highlights = new Dictionary<LevelOfDetail, LevelHighlights>();
         private bool _show;
 
         public TileHighlighter(TileCacheTracker tracker, MapView mapView)
@@ -38,15 +38,15 @@ namespace TestQueryFeatures
 
             var nearestLevel = _tracker.GetNearestLevel(scale);
 
-            foreach (var kvp in _overlays)
+            foreach (var kvp in _highlights)
             {
                 if (kvp.Key.Scale == nearestLevel.LevelOfDetail.Scale)
                 {
-                    kvp.Value.IsVisible = true;
+                    kvp.Value.Overlay.IsVisible = true;
                 }
                 else
                 {
-                    kvp.Value.IsVisible = false;
+                    kvp.Value.Overlay.IsVisible = false;
                 }
             }
         }
@@ -63,10 +63,15 @@ namespace TestQueryFeatures
             await _highlightSemaphore.WaitAsync();
             try
             {
-                var overlay = GetOverlay(tile.LevelOfDetail);
-                overlay.Graphics.Add(new Graphic()
+                var highlights = GetHighlights(tile.LevelOfDetail);
+                if (highlights.Tiles.Contains(tile.Position))
                 {
-                    Geometry = tile.Envelope,
+                    return;
+                }
+                highlights.Tiles.Add(tile.Position);
+                highlights.Overlay.Graphics.Add(new Graphic()
+                {
+                    Geometry = tile.Envelope.ToEnvelope(),
                     Symbol = new SimpleFillSymbol(
                         SimpleFillSymbolStyle.Solid,
                         System.Drawing.Color.FromArgb(11, System.Drawing.Color.Indigo),
@@ -77,9 +82,9 @@ namespace TestQueryFeatures
                     ZIndex = 1
                 });
 
-                overlay.Graphics.Add(new Graphic()
+                highlights.Overlay.Graphics.Add(new Graphic()
                 {
-                    Geometry = tile.Envelope.GetCenter(),
+                    Geometry = tile.Envelope.ToEnvelope().GetCenter(),
                     Symbol = new TextSymbol($"{tile.LevelOfDetail.Level}: ({tile.Position})", System.Drawing.Color.White, 32, HorizontalAlignment.Center, VerticalAlignment.Middle) { HaloColor = System.Drawing.Color.Black },
                     ZIndex = 2
                 });
@@ -90,27 +95,26 @@ namespace TestQueryFeatures
             }
         }
 
-        private GraphicsOverlay GetOverlay(LevelOfDetail lod)
+        private LevelHighlights GetHighlights(LevelOfDetail lod)
         {
-            if (_overlays.TryGetValue(lod, out var overlay))
+            if (_highlights.TryGetValue(lod, out var highlights))
             {
-                return overlay;
+                return highlights;
             }
 
-            overlay = new GraphicsOverlay()
-            {
-                IsVisible = _show
-            };
-            _overlays.Add(lod, overlay);
-            _mapView.GraphicsOverlays.Add(overlay);
-            return overlay;
+            highlights = new LevelHighlights();
+            highlights.Overlay.IsVisible = _show;
+            _highlights.Add(lod, highlights);
+            _mapView.GraphicsOverlays.Add(highlights.Overlay);
+            return highlights;
         }
 
         public void Reset()
         {
-            foreach (var overlay in _overlays.Values)
+            foreach (var highlights in _highlights.Values)
             {
-                overlay.Graphics.Clear();
+                highlights.Overlay.Graphics.Clear();
+                highlights.Tiles.Clear();
             }
         }
 
@@ -123,10 +127,17 @@ namespace TestQueryFeatures
         public void Hide()
         {
             _show = false;
-            foreach (var overlay in _overlays.Values)
+            foreach (var highlights in _highlights.Values)
             {
-                overlay.IsVisible = false;
+                highlights.Overlay.IsVisible = false;
             }
+        }
+
+        private class LevelHighlights
+        {
+            public HashSet<TilePosition> Tiles { get; } = new HashSet<TilePosition>();
+
+            public GraphicsOverlay Overlay { get; } = new GraphicsOverlay();
         }
     }
 }

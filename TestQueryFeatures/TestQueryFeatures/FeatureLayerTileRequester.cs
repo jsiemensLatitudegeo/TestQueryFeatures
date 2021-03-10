@@ -1,6 +1,7 @@
 ﻿using Esri.ArcGISRuntime.Data;
 using Esri.ArcGISRuntime.Geometry;
 using Esri.ArcGISRuntime.Mapping;
+using Esri.ArcGISRuntime.Symbology;
 using Esri.ArcGISRuntime.Xamarin.Forms;
 using System;
 using System.Collections.Generic;
@@ -124,77 +125,93 @@ namespace TestQueryFeatures
             var extent = (Envelope)_mapView.GetCurrentViewpoint(ViewpointType.BoundingGeometry).TargetGeometry;
             (var level, var tiles) = _tileCacheTracker.GetTiles(scale, extent);
             FeatureCount = level.FeatureCount;
-            await Task.Run(async () =>
+
+            var allRequests = new List<Task>();
+            Parallel.ForEach(tiles.EnumerateColumnsThenRows(), tile =>
             {
-                var allRequests = new List<Task>();
-                foreach (var tile in tiles.EnumerateColumnsThenRows())
+                _tileHighlighter.HighlightTile(tile);
+
+                foreach (var fl in _mapView.Map.OperationalLayers.OfType<FeatureLayer>())
                 {
-                    if (level.IsTileCached(tile.Position))
+                    if (!level.IsTileCached(tile.Position, fl))
                     {
-                        //Debug.WriteLine($"*** Skipping cached tile {tile.LevelOfDetail.Level}: {tile.Position}; {tile.Envelope} ***");
-                        continue;
+                        allRequests.Add(RequestForLayer(level, fl, tile, cancellation.Token));
                     }
-
-                    _tileHighlighter.HighlightTile(tile);
-                    //Debug.WriteLine($"--- Begining request for tile {tile.LevelOfDetail.Level}: {tile.Position}; {tile.Envelope} ---");
-
-                    foreach (var fl in _mapView.Map.OperationalLayers.OfType<FeatureLayer>())
-                    {
-                        allRequests.Add(RequestForLayer(fl, tile).ContinueWith((count) =>
-                        {
-                            if (!cancellation.IsCancellationRequested)
-                            {
-                                level.FeatureCount += count.Result;
-                                Device.BeginInvokeOnMainThread(() =>
-                                {
-                                    var currentScale = _mapView.GetCurrentViewpoint(ViewpointType.CenterAndScale).TargetScale;
-                                    var currentLevel = _tileCacheTracker.GetNearestLevel(currentScale);
-                                    if (level == currentLevel)
-                                    {
-                                        FeatureCount = level.FeatureCount;
-                                    }
-                                });
-                            }
-                        }));
-                    }
-
-                    level.MarkTileAsCached(tile.Position);
                 }
-
-                await Task.WhenAll(allRequests);
             });
+            await Task.WhenAll(allRequests);
         }
 
-        private async Task<int> RequestForLayer(FeatureLayer fl, Tile tile)
+        private async Task<int> RequestForLayer(TileCacheTrackerLevel level, FeatureLayer fl, Tile tile, CancellationToken cancellation)
         {
-            if (fl.FeatureTable is ServiceFeatureTable serviceTable)
+            try
             {
-                //Debug.WriteLine($"- Begining request for layer {fl.Name} -");
-                int offset = 0;
-
-                while (true)
+                if (fl.FeatureTable is ServiceFeatureTable serviceTable)
                 {
-                    var result = await serviceTable.PopulateFromServiceAsync(new QueryParameters()
-                    {
-                        Geometry = tile.Envelope,
-                        ResultOffset = offset
-                    }, false, new string[] { serviceTable.ObjectIdField }, _cancellation.Token);
-                    var count = result.Count();
-                    //Debug.WriteLine($"{count} features returned.");
+                    level.MarkTileAsCached(tile.Position, fl);
+                    int offset = 0;
 
-                    offset += count;
-
-                    if (!result.IsTransferLimitExceeded)
+                    while (true)
                     {
-                        break;
+                        var result = await serviceTable.PopulateFromServiceAsync(new QueryParameters()
+                        {
+                            Geometry = tile.Envelope.ToEnvelope(),
+                            ResultOffset = offset
+                        }, false, GetRenderFields(fl), _cancellation.Token);
+                        var count = result.Count();
+
+                        offset += count;
+
+                        if (!result.IsTransferLimitExceeded)
+                        {
+                            break;
+                        }
+                    }
+
+                    if (!cancellation.IsCancellationRequested)
+                    {
+                        level.FeatureCount += offset;
+                        Device.BeginInvokeOnMainThread(() =>
+                        {
+                            var currentScale = _mapView.GetCurrentViewpoint(ViewpointType.CenterAndScale).TargetScale;
+                            var currentLevel = _tileCacheTracker.GetNearestLevel(currentScale);
+                            if (level == currentLevel)
+                            {
+                                FeatureCount = level.FeatureCount;
+                            }
+                        });
                     }
                 }
-
-                return offset;
+            }
+            catch (Exception)
+            {
+                level.MarkTileAsNotCached(tile.Position, fl);
             }
 
             return 0;
         }
 
+        private string[] GetRenderFields(FeatureLayer layer)
+        {
+            if (layer.FeatureTable is ServiceFeatureTable serviceTable)
+            {
+                var fields = new List<string>() { serviceTable.ObjectIdField };
+                if (layer.Renderer is ClassBreaksRenderer classBreaks)
+                {
+                    fields.Add(classBreaks.FieldName);
+                }
+                else if (layer.Renderer is UniqueValueRenderer uniqueValueRenderer)
+                {
+                    foreach (var fieldName in uniqueValueRenderer.FieldNames)
+                    {
+                        fields.Add(fieldName);
+                    }
+                }
+
+                return fields.ToArray();
+            }
+
+            return Array.Empty<string>();
+        }
     }
 }

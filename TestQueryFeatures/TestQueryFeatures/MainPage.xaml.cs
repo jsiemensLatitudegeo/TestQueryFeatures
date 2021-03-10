@@ -93,13 +93,13 @@ namespace TestQueryFeatures
 
         private void UpdateDrawTime(TimeSpan? subtract = null)
         {
-            var ellapsed = subtract.HasValue ?  _drawTimer.Elapsed.Subtract(subtract.Value) : _drawTimer.Elapsed;
+            var ellapsed = subtract.HasValue ? _drawTimer.Elapsed.Subtract(subtract.Value) : _drawTimer.Elapsed;
             DrawTimeLabel.Text = $"{ellapsed.Minutes:00}:{ellapsed.Seconds:00}:{ellapsed.Milliseconds:000}";
         }
 
         private async void SetMap()
         {
-            MainMapView.Map = await Map.LoadFromUriAsync(new Uri("https://latitudegeo.maps.arcgis.com/home/item.html?id=211f9fb2a58b4a7693fb28fec4b1ce71"));
+            MainMapView.Map = await Map.LoadFromUriAsync(new Uri("https://latitudegeo.maps.arcgis.com/home/item.html?id=ae66491bf2c0422ca3b89c5277fcf04d"));
             Tiler = new FeatureLayerTileRequester(MainMapView);
             OnPropertyChanged(nameof(Tiler));
         }
@@ -108,7 +108,12 @@ namespace TestQueryFeatures
         {
             Reset();
 
-            var layer = (FeatureLayer)MainMapView.Map.OperationalLayers.First(X => X.Id == "Victoria_Buildings_4805");
+            var layer = MainMapView.Map.OperationalLayers.OfType<FeatureLayer>().FirstOrDefault(X => X.Id == "Victoria_Buildings_4805");
+            if (layer == null)
+            {
+                return;
+            }
+
             var queryResults = await layer.FeatureTable.QueryFeaturesAsync(new Esri.ArcGISRuntime.Data.QueryParameters()
             {
                 Geometry = GeometryEngine.Buffer(e.Location, 20 * MainMapView.UnitsPerPixel)

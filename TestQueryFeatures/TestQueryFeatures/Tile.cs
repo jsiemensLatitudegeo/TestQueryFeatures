@@ -10,14 +10,14 @@ namespace TestQueryFeatures
     {
         public TilePosition Position { get; }
 
-        public Envelope Envelope { get; }
+        public SlimEnvelope Envelope { get; }
 
         public LevelOfDetail LevelOfDetail { get; }
 
-        public Tile(TilePosition position, Envelope envelope, LevelOfDetail lod)
+        public Tile(TilePosition position, SlimEnvelope envelope, LevelOfDetail lod)
         {
             Position = position;
-            Envelope = envelope ?? throw new ArgumentNullException(nameof(envelope));
+            Envelope = envelope;
             LevelOfDetail = lod ?? throw new ArgumentNullException(nameof(lod));
         }
     }

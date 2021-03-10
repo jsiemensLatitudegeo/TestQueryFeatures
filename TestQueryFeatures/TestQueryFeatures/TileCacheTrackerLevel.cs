@@ -1,14 +1,16 @@
 ﻿using Esri.ArcGISRuntime.ArcGISServices;
 using Esri.ArcGISRuntime.Geometry;
+using Esri.ArcGISRuntime.Mapping;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 
 namespace TestQueryFeatures
 {
     internal class TileCacheTrackerLevel
     {
-        private HashSet<TilePosition> _cachedTiles = new HashSet<TilePosition>();
+        private Dictionary<Layer, HashSet<TilePosition>> _cachedTiles = new Dictionary<Layer, HashSet<TilePosition>>();
 
         public double TileWidthMapUnits { get; }
 
@@ -42,17 +44,38 @@ namespace TestQueryFeatures
             TileHeightMapUnits = level.Resolution * 256;
         }
 
-        public void MarkTileAsCached(TilePosition position)
+        public void MarkTileAsCached(TilePosition position, Layer layer)
         {
-            _cachedTiles.Add(position);
+            if (!_cachedTiles.TryGetValue(layer, out var lookup))
+            {
+                lookup = new HashSet<TilePosition>();
+                _cachedTiles.Add(layer, lookup);
+            }
+
+            lookup.Add(position);
         }
 
-        public bool IsTileCached(TilePosition position)
+        public void MarkTileAsNotCached(TilePosition position, Layer layer)
         {
-            return _cachedTiles.Contains(position);
+            if (_cachedTiles.TryGetValue(layer, out var lookup) && lookup.Contains(position))
+            {
+                lookup.Remove(position);
+            }
         }
 
-        public Tile[,] GetTiles(Envelope envelope)
+        public bool IsTileCached(TilePosition position, Layer layer)
+        {
+            return _cachedTiles.TryGetValue(layer, out var lookup) && lookup.Contains(position);
+        }
+
+        public bool DoesCacheCover(Tile tile, Layer layer)
+        {
+            var tiles = GetTiles(tile.Envelope);
+            bool[] isCached = tiles.OfType<Tile>().Select(x => IsTileCached(x.Position, layer)).ToArray();
+            return isCached.All(x => x);
+        }
+
+        public Tile[,] GetTiles(SlimEnvelope envelope)
         {
             if (envelope is null)
             {
@@ -65,7 +88,7 @@ namespace TestQueryFeatures
             var endColumn = (int)Math.Ceiling((envelope.XMax - Origin.X) / TileWidthMapUnits);
 
             var numRows = endRow - startRow + 1;
-            var numColumns = endColumn - startColumn + 1;
+            var numColumns = endColumn - startColumn;
             var tiles = new Tile[numColumns, numRows];
             for (int x = 0; x < numColumns; x++)
             {
@@ -78,7 +101,7 @@ namespace TestQueryFeatures
                     var ymin = Origin.Y - ((row + 1) * TileHeightMapUnits);
                     var xmax = xmin + TileWidthMapUnits;
                     var ymax = ymin + TileHeightMapUnits;
-                    tiles[x, y] = new Tile(tilePosition, new Envelope(xmin, ymin, xmax, ymax, SpatialReference), LevelOfDetail);
+                    tiles[x, y] = new Tile(tilePosition, new SlimEnvelope(xmin, ymin, xmax, ymax, SpatialReference), LevelOfDetail);
                 }
             }
 
@@ -89,6 +112,34 @@ namespace TestQueryFeatures
         {
             _cachedTiles.Clear();
             FeatureCount = 0;
+        }
+
+        private struct TileCacheKey
+        {
+            public TilePosition Position { get; set; }
+
+            public Layer Layer { get; set; }
+
+            public TileCacheKey(TilePosition position, Layer layer)
+            {
+                Position = position;
+                Layer = layer;
+            }
+
+            public override bool Equals(object obj)
+            {
+                return obj is TileCacheKey key &&
+                       EqualityComparer<TilePosition>.Default.Equals(Position, key.Position) &&
+                       EqualityComparer<Layer>.Default.Equals(Layer, key.Layer);
+            }
+
+            public override int GetHashCode()
+            {
+                int hashCode = -1770035120;
+                hashCode = hashCode * -1521134295 + Position.GetHashCode();
+                hashCode = hashCode * -1521134295 + EqualityComparer<Layer>.Default.GetHashCode(Layer);
+                return hashCode;
+            }
         }
     }
 }
